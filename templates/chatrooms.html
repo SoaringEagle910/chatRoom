@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Rooms</title>
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.6.1/dist/socket.io.min.js"></script>
+    <script>
+        var socket = io.connect(window.location.origin);
+
+        // 监听新聊天室创建事件
+        socket.on('new_room_created', function(data) {
+            let roomName = data.room_name;
+            let chatroomsList = document.getElementById('chatrooms-list');
+            let newRoomItem = document.createElement('li');
+            newRoomItem.innerHTML = <a href="/chat/${roomName}">${roomName}</a>;
+            chatroomsList.appendChild(newRoomItem);
+        });
+
+        // 监听用户加入聊天室事件
+        socket.on('user_joined', function(data) {
+            let roomName = data.room_name;
+            let username = data.username;
+            let membersList = document.getElementById('members-list-' + roomName);
+            let newMemberItem = document.createElement('li');
+            newMemberItem.innerText = username;
+            membersList.appendChild(newMemberItem);
+        });
+
+        // 监听用户离开聊天室事件
+        socket.on('user_left', function(data) {
+            let roomName = data.room_name;
+            let username = data.username;
+            let membersList = document.getElementById('members-list-' + roomName);
+            let items = membersList.getElementsByTagName('li');
+            for (let item of items) {
+                if (item.innerText === username) {
+                    membersList.removeChild(item);
+                    break;
+                }
+            }
+        });
+    </script>
+</head>
+<body>
+    <h2>Welcome, {{ username }}!</h2>
+    <h3>Available Chat Rooms</h3>
+    <ul id="chatrooms-list">
+        {% for room, members in chatrooms.items() %}
+            <li>
+                <a href="{{ url_for('chat', room_name=room) }}">{{ room }}</a>
+                <ul id="members-list-{{ room }}">
+                    {% for member in members %}
+                        <li>{{ member }}</li>
+                    {% endfor %}
+                </ul>
+            </li>
+        {% endfor %}
+    </ul>
+
+    <h3>Create a New Room</h3>
+    <form method="POST">
+        <input type="text" name="room_name" placeholder="Room Name" required>
+        <button type="submit">Create</button>
+    </form>
+
+    <a href="{{ url_for('logout') }}">Logout</a>
+</body>
+</html>

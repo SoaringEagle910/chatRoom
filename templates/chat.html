@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Room</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+        }
+        #chat-box {
+            width: 80%;
+            height: 60%;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 10px;
+            overflow-y: scroll;
+        }
+        #message-input {
+            width: 80%;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        #send-btn {
+            padding: 10px 20px;
+            margin-left: 10px;
+        }
+        #leave-btn {
+            padding: 10px 20px;
+            margin-top: 10px;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .message {
+            padding: 5px;
+            margin: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .user-message {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h2>Welcome, {{ username }}!</h2>
+    <a href="{{ url_for('logout') }}">Logout</a>
+    <h3>Chat Room: {{ room_name }}</h3>
+
+    <!-- 退出聊天室按钮 -->
+    <button id="leave-btn">Leave Chat Room</button>
+
+    <div id="chat-box"></div>
+    <input type="text" id="message-input" placeholder="Type a message..." />
+    <button id="send-btn">Send</button>
+
+    <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
+    <script>
+    const socket = io();
+    const room = "{{ room_name }}";
+
+    // Join the room
+    socket.emit('join', {room: room});
+
+    // Send messages
+    document.getElementById('send-btn').onclick = function() {
+        const message = document.getElementById('message-input').value;
+        if (message) {
+            socket.emit('message', {room_name: room, message: message});  // 修改这里的字段名
+            document.getElementById('message-input').value = '';
+        }
+    };
+
+    // Display incoming messages
+    socket.on('message', function(msg) {
+        const chatBox = document.getElementById('chat-box');
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('message');
+        messageElement.textContent = msg;
+        chatBox.appendChild(messageElement);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    });
+
+    // 退出聊天室按钮点击事件
+    document.getElementById('leave-btn').onclick = function() {
+        // 发送请求到服务器，离开当前聊天室
+        window.location.href = "{{ url_for('leave_room', room_name=room_name) }}";  // 调用 leave_room 接口
+    };
+    </script>
+</body>
+</html>
