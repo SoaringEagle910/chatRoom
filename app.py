@@ -1,10 +1,18 @@
 from flask import Flask, render_template, request, session, redirect, url_for, flash
 from flask_socketio import SocketIO, emit, join_room
+from flask_session import Session
 import os
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'  # 配置 session 密钥
-socketio = SocketIO(app)
+
+# 配置 Flask-Session
+app.config['SESSION_TYPE'] = 'filesystem'  # 使用文件系统存储 session
+app.config['SECRET_KEY'] = 'your_secret_key'  # 配置 session 密钥
+app.config['SESSION_PERMANENT'] = False  # 设置 session 非永久
+Session(app)
+
+socketio = SocketIO(app, manage_session=False)
+
 
 # 用户信息存储文件
 USER_FILE = 'users.txt'
@@ -22,7 +30,6 @@ def get_users():
             username, password = line.strip().split(':')
             users[username] = password
     return users
-
 
 # 注册页面
 @app.route('/register', methods=['GET', 'POST'])
@@ -45,7 +52,6 @@ def register():
 
     return render_template('register.html')
 
-
 # 登录页面
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -63,7 +69,6 @@ def login():
         return redirect(url_for('chatrooms_page'))
 
     return render_template('login.html')
-
 
 # 聊天室选择页面（显示现有聊天室并允许创建新聊天室）
 @app.route('/chatrooms', methods=['GET', 'POST'])
@@ -88,7 +93,6 @@ def chatrooms_page():
     # 将聊天室及其成员信息传递到模板
     return render_template('chatrooms.html', chatrooms=chatrooms, username=username)
 
-
 # 进入聊天室
 @app.route('/chat/<room_name>')
 def chat(room_name):
@@ -110,7 +114,6 @@ def chat(room_name):
     members = chatrooms[room_name]
     return render_template('chat.html', username=username, room_name=room_name, members=members)
 
-
 # 退出聊天室
 @app.route('/leave/<room_name>')
 def leave_room(room_name):
@@ -125,7 +128,6 @@ def leave_room(room_name):
 
     return redirect(url_for('chatrooms_page'))
 
-
 # 退出登录
 @app.route('/logout')
 def logout():
@@ -133,14 +135,12 @@ def logout():
     flash('You have been logged out.', 'success')
     return redirect(url_for('login'))
 
-
 # 聊天页面主页
 @app.route('/')
 def home():
     if 'username' not in session:
         return redirect(url_for('login'))
     return redirect(url_for('chatrooms_page'))
-
 
 # 处理聊天消息时，包含用户名
 @socketio.on('message')
@@ -151,7 +151,6 @@ def handle_message(data):
 
     # 广播消息到房间
     emit('message', message, room=room_name)
-
 
 @socketio.on('join')
 def handle_join(data):
@@ -164,7 +163,6 @@ def handle_join(data):
     # 广播用户加入聊天室的消息
     emit('message', f"{username} has joined the chat!", room=room_name)
 
-
 @socketio.on('disconnect')
 def handle_disconnect():
     username = session.get('username')
@@ -174,6 +172,6 @@ def handle_disconnect():
             if username in members:
                 members.remove(username)
 
-
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    socketio.run(app, host='0.0.0.0', port=5000)
+

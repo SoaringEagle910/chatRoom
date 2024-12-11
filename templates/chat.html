@@ -73,26 +73,23 @@
     // Send messages
     document.getElementById('send-btn').onclick = function() {
         const message = document.getElementById('message-input').value;
-        if (message) {
-            socket.emit('message', {room_name: room, message: message});  // 修改这里的字段名
-            document.getElementById('message-input').value = '';
-        }
+        socket.emit('message', {room_name: room, message: message});
+        document.getElementById('message-input').value = '';  // 清空输入框
     };
 
-    // Display incoming messages
-    socket.on('message', function(msg) {
+    // 接收消息并显示
+    socket.on('message', function(data) {
         const chatBox = document.getElementById('chat-box');
-        const messageElement = document.createElement('div');
-        messageElement.classList.add('message');
-        messageElement.textContent = msg;
-        chatBox.appendChild(messageElement);
-        chatBox.scrollTop = chatBox.scrollHeight;
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message';
+        messageDiv.innerText = data;
+        chatBox.appendChild(messageDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;  // 滚动到底部
     });
 
-    // 退出聊天室按钮点击事件
+    // 退出聊天室
     document.getElementById('leave-btn').onclick = function() {
-        // 发送请求到服务器，离开当前聊天室
-        window.location.href = "{{ url_for('leave_room', room_name=room_name) }}";  // 调用 leave_room 接口
+        window.location.href = '/leave/' + room;
     };
     </script>
 </body>
