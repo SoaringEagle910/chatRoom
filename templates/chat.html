@@ -48,6 +48,24 @@
         .user-message {
             font-weight: bold;
         }
+        #members {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            width: 80%;
+        }
+        #members h4 {
+            margin-top: 0;
+        }
+        #members ul {
+            list-style: none;
+            padding: 0;
+        }
+        #members li {
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
     </style>
 </head>
 <body>
@@ -58,7 +76,25 @@
     <!-- 退出聊天室按钮 -->
     <button id="leave-btn">Leave Chat Room</button>
 
-    <div id="chat-box"></div>
+    <!-- 当前聊天室成员 -->
+    <div id="members">
+        <h4>Current Members:</h4>
+        <ul id="member-list">
+            {% for member in members %}
+                <li>{{ member }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div id="chat-box">
+        <!-- 历史消息 -->
+        {% for msg in messages %}
+            <div class="message">
+                <span class="user-message">{{ msg.timestamp }} - </span>
+                {{ msg.message }}
+            </div>
+        {% endfor %}
+    </div>
     <input type="text" id="message-input" placeholder="Type a message..." />
     <button id="send-btn">Send</button>
 
@@ -87,9 +123,22 @@
         chatBox.scrollTop = chatBox.scrollHeight;  // 滚动到底部
     });
 
+    // 接收聊天室成员更新事件
+    socket.on('update_members', function(data) {
+        const members = data.members;
+        const memberList = document.getElementById('member-list');
+        memberList.innerHTML = '';  // 清空成员列表
+        members.forEach(function(member) {
+            const li = document.createElement('li');
+            li.textContent = member;
+            memberList.appendChild(li);
+        });
+    });
+
     // 退出聊天室
     document.getElementById('leave-btn').onclick = function() {
-        window.location.href = '/leave/' + room;
+        socket.emit('leave', {room: room});  // 发送离开事件到服务器
+        window.location.href = '/';  // 退出后跳转到主页或其他页面
     };
     </script>
 </body>

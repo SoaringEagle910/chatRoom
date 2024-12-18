@@ -14,7 +14,13 @@
             var roomName = data.room_name;
             // 创建聊天室列表项
             var li = document.createElement('li');
-            li.innerHTML = `<a href="/chat/${roomName}">${roomName}</a><br><strong>Online Members:</strong> No members online`;
+            li.innerHTML = `
+                <a href="/chat/${roomName}">${roomName}</a><br>
+                <strong>Online Members:</strong> No members online
+                <form method="POST" action="/delete_chatroom/${roomName}" style="display:inline;">
+                    <button type="submit">Delete</button>
+                </form>
+            `;
             // 将新聊天室添加到聊天室列表
             document.getElementById('chatroom-list').appendChild(li);
         });
@@ -28,6 +34,10 @@
             <li>
                 <a href="{{ url_for('chat', room_name=room) }}">{{ room }}</a><br>
                 <strong>Online Members:</strong> {{ ", ".join(members) if members else "No members online" }}
+                <!-- 删除聊天室按钮 -->
+                <form method="POST" action="{{ url_for('delete_chatroom', room_name=room) }}" style="display:inline;">
+                    <button type="submit">Delete</button>
+                </form>
             </li>
         {% endfor %}
     </ul>
