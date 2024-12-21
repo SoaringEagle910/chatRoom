@@ -4,74 +4,193 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Room</title>
+    <!-- 引入 Google Fonts 和 Font Awesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Poppins', sans-serif;
+            background-color: #f4f4f9;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;  /* 保证内容向上对齐 */
             height: 100vh;
-            margin: 0;
-            background-color: #f4f4f4;
+            color: #333;
+            margin-top: 50px; /* 调整页面整体下移 */
         }
+
+        h2 {
+            font-size: 2rem;
+            color: #007bff;
+            margin-bottom: 20px;
+        }
+
+        h3 {
+            font-size: 2rem;
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+
         #chat-box {
             width: 80%;
-            height: 60%;
-            background-color: #fff;
+            height: 50%;
+            background-color: white;
+            border-radius: 8px;
             border: 1px solid #ccc;
-            padding: 10px;
+            padding: 15px;
+            margin-top: 20px;
             overflow-y: scroll;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
+
         #message-input {
-            width: 80%;
-            padding: 10px;
+            width: 78%;
+            padding: 12px;
             margin-top: 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 1rem;
         }
+
         #send-btn {
-            padding: 10px 20px;
+            padding: 12px 20px;
             margin-left: 10px;
+            border-radius: 8px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
         }
+
+        #send-btn:hover {
+            background-color: #0056b3;
+        }
+
         #leave-btn {
-            padding: 10px 20px;
-            margin-top: 10px;
+            padding: 12px 20px;
+            margin-top: 20px;
             background-color: #f44336;
             color: white;
             border: none;
+            border-radius: 8px;
+            font-size: 1rem;
             cursor: pointer;
+            transition: background-color 0.3s;
         }
+
+        #leave-btn:hover {
+            background-color: #d32f2f;
+        }
+
         .message {
-            padding: 5px;
-            margin: 5px 0;
+            padding: 10px;
+            margin: 10px 0;
             border-bottom: 1px solid #eee;
+            background-color: #fafafa;
+            border-radius: 8px;
+            font-size: 1rem;
         }
+
         .user-message {
             font-weight: bold;
+            color: #007bff;
         }
+
+        /* 添加滚动区域的样式 */
         #members {
             margin-top: 20px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            background-color: #fff;
             width: 80%;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border: 1px solid #ccc;
+            max-height: 200px; /* 限制高度 */
+            overflow-y: auto; /* 添加垂直滚动条 */
         }
+
         #members h4 {
-            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+            color: #007bff;
         }
+
         #members ul {
             list-style: none;
             padding: 0;
         }
+
         #members li {
-            padding: 5px;
+            padding: 10px;
             border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .kick-btn {
+            padding: 5px 10px;
+            font-size: 0.9rem;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .kick-btn:hover {
+            background-color: #d32f2f;
+        }
+
+        a {
+            text-decoration: none;
+            color: #007bff;
+            font-size: 1rem;
+            margin-top: 10px;
+            display: inline-block;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        /* 修改Chatroom Description的居中样式 */
+        #room-description {
+            width: 80%;
+            text-align: center;
+            margin: 20px auto; /* 自动水平居中，确保块级元素居中 */
+        }
+
+        /* 移除Welcome和Logout的内容 */
+        #welcome-logout {
+            display: none;
         }
     </style>
 </head>
 <body>
-    <h2>Welcome, {{ username }}!</h2>
-    <a href="{{ url_for('logout') }}">Logout</a>
+    <div id="welcome-logout">
+        <h2>Welcome, {{ username }}!</h2>
+        <a href="{{ url_for('logout') }}">Logout</a>
+    </div>
+
     <h3>Chat Room: {{ room_name }}</h3>
+
+    <!-- 显示聊天室介绍 -->
+    <div id="room-description">
+        <h4>Chatroom Description:</h4>
+        <p>{{ description }}</p>
+    </div>
 
     <!-- 退出聊天室按钮 -->
     <button id="leave-btn">Leave Chat Room</button>
@@ -81,7 +200,12 @@
         <h4>Current Members:</h4>
         <ul id="member-list">
             {% for member in members %}
-                <li>{{ member }}</li>
+                <li>
+                    {{ member }}
+                    {% if member != username %}
+                        <button class="kick-btn" data-member="{{ member }}">Kick Out</button>
+                    {% endif %}
+                </li>
             {% endfor %}
         </ul>
     </div>
@@ -103,13 +227,13 @@
     const socket = io();
     const room = "{{ room_name }}";
 
-    // Join the room
-    socket.emit('join', {room: room});
+    // 加入聊天室
+    socket.emit('join', { room: room });
 
-    // Send messages
+    // 发送消息
     document.getElementById('send-btn').onclick = function() {
         const message = document.getElementById('message-input').value;
-        socket.emit('message', {room_name: room, message: message});
+        socket.emit('message', { room_name: room, message: message });
         document.getElementById('message-input').value = '';  // 清空输入框
     };
 
@@ -128,17 +252,42 @@
         const members = data.members;
         const memberList = document.getElementById('member-list');
         memberList.innerHTML = '';  // 清空成员列表
+
         members.forEach(function(member) {
             const li = document.createElement('li');
             li.textContent = member;
+
+            // 只有不是当前用户才显示踢出按钮
+            if (member !== '{{ username }}') {
+                const kickButton = document.createElement('button');
+                kickButton.className = 'kick-btn';
+                kickButton.setAttribute('data-member', member);
+                kickButton.textContent = 'Kick Out';
+                li.appendChild(kickButton);
+            }
+
             memberList.appendChild(li);
         });
+
+        // 绑定踢出按钮事件
+        bindKickButtons();
     });
 
-    // 退出聊天室
+    // 处理踢出按钮点击
+    function bindKickButtons() {
+        const kickButtons = document.querySelectorAll('.kick-btn');
+        kickButtons.forEach(button => {
+            button.onclick = function() {
+                const member = this.getAttribute('data-member');
+                socket.emit('kick', { room: room, member: member });
+            };
+        });
+    }
+
+    // 离开聊天室
     document.getElementById('leave-btn').onclick = function() {
-        socket.emit('leave', {room: room});  // 发送离开事件到服务器
-        window.location.href = '/';  // 退出后跳转到主页或其他页面
+        socket.emit('leave', { room: room });
+        window.location.href = '/';  // 被踢出后跳转
     };
     </script>
 </body>

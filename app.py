@@ -61,7 +61,7 @@ def load_online_users():
 # 保存聊天室数据
 def save_chatrooms():
     with open(CHATROOMS_FILE, 'w') as f:
-        json.dump(chatrooms, f)
+        json.dump(chatrooms, f, ensure_ascii=False, indent=4)
 
 
 # 保存在线用户数据
@@ -139,8 +139,6 @@ def login():
 
     return render_template('login.html')
 
-
-# 聊天室选择页面（显示现有聊天室并允许创建新聊天室）
 @app.route('/chatrooms', methods=['GET', 'POST'])
 def chatrooms_page():
     if 'username' not in session:
@@ -151,17 +149,20 @@ def chatrooms_page():
     if request.method == 'POST':
         # 创建新聊天室
         room_name = request.form['room_name']
+        description = request.form['description']  # 获取聊天室介绍
         if room_name in chatrooms:
             flash('Chatroom already exists. Please choose another name.', 'error')
         else:
-            chatrooms[room_name] = []  # 初始化聊天室为空
+            chatrooms[room_name] = {
+                'members': [],  # 初始化成员为空
+                'description': description  # 存储聊天室的介绍
+            }
             save_chatrooms()  # 保存聊天室数据到文件
             # 广播聊天室创建事件
-            socketio.emit('new_room_created', {'room_name': room_name}, to=None)
+            socketio.emit('new_room_created', {'room_name': room_name, 'description': description}, to=None)
 
         flash(f'Chatroom "{room_name}" created successfully!', 'success')
 
-    # 将聊天室及其成员信息传递到模板
     return render_template('chatrooms.html', chatrooms=chatrooms, username=username)
 
 # 删除聊天室
@@ -185,7 +186,12 @@ def delete_chatroom(room_name):
         os.remove(log_file)
 
     flash(f'Chatroom "{room_name}" has been deleted.', 'success')
+
+    # 广播聊天室删除事件给所有用户
+    socketio.emit('chatroom_deleted', {'room': room_name}, to=None)
+
     return redirect(url_for('chatrooms_page'))
+
 
 
 # 进入聊天室
@@ -202,8 +208,8 @@ def chat(room_name):
         return redirect(url_for('chatrooms_page'))
 
     # 加入聊天室
-    if username not in chatrooms[room_name]:
-        chatrooms[room_name].append(username)
+    if username not in chatrooms[room_name]['members']:
+        chatrooms[room_name]['members'].append(username)
         save_chatrooms()  # 保存聊天室信息到文件
 
     # 加载聊天记录
@@ -214,10 +220,13 @@ def chat(room_name):
             messages = json.load(f).get(room_name, [])
 
     # 获取当前聊天室的成员
-    members = chatrooms[room_name]
+    members = chatrooms[room_name]['members']
 
-    # 将聊天室成员和历史消息传递给模板
-    return render_template('chat.html', username=username, room_name=room_name, members=members, messages=messages)
+    # 获取聊天室的描述
+    description = chatrooms[room_name].get('description', 'No description available.')
+
+    # 将聊天室成员、历史消息和聊天室描述传递给模板
+    return render_template('chat.html', username=username, room_name=room_name, members=members, messages=messages, description=description)
 
 
 # 退出聊天室
@@ -228,8 +237,8 @@ def leave_room(room_name):
 
     username = session['username']
 
-    if room_name in chatrooms and username in chatrooms[room_name]:
-        chatrooms[room_name].remove(username)
+    if room_name in chatrooms and username in chatrooms[room_name]['members']:
+        chatrooms[room_name]['members'].remove(username)
         save_chatrooms()  # 保存聊天室信息到文件
         flash(f'You have left the chatroom "{room_name}".', 'success')
 
@@ -275,15 +284,16 @@ def handle_join(data):
     join_room(room_name)
 
     # 将用户加入聊天室的成员列表
-    if username not in chatrooms[room_name]:
-        chatrooms[room_name].append(username)
-        save_chatrooms()  # 保存聊天室信息到文件
+    if username not in chatrooms[room_name]['members']:
+        chatrooms[room_name]['members'].append(username)
+        save_chatrooms()
 
-    # 广播更新聊天室成员列表
-    emit('update_members', {'members': chatrooms[room_name]}, room=room_name)
+    # 广播更新聊天室成员列表给所有客户端
+    emit('update_members', {'room': room_name, 'members': chatrooms[room_name]['members']}, broadcast=True)
 
     # 广播用户加入聊天室的消息
-    emit('message', f"{username} has joined the chat!", room=room_name)
+    emit('message', f"{username} has joined the chat.", room=room_name)
+
 
 @socketio.on('leave')
 def handle_leave(data):
@@ -294,15 +304,16 @@ def handle_leave(data):
     leave_room(room_name)
 
     # 从聊天室成员列表中移除用户
-    if username in chatrooms[room_name]:
-        chatrooms[room_name].remove(username)
+    if username in chatrooms[room_name]['members']:
+        chatrooms[room_name]['members'].remove(username)
         save_chatrooms()  # 保存聊天室信息到文件
 
-    # 广播更新聊天室成员列表
-    emit('update_members', {'members': chatrooms[room_name]}, room=room_name)
+    # 广播更新聊天室成员列表给所有客户端
+    emit('update_members', {'room': room_name, 'members': chatrooms[room_name]['members']}, broadcast=True)
 
     # 广播用户退出聊天室的消息
     emit('message', f"{username} has left the chat.", room=room_name)
+
 
 
 @socketio.on('disconnect')
@@ -313,17 +324,71 @@ def handle_disconnect():
         for room_name, members in chatrooms.items():
             if username in members:
                 members.remove(username)
+                # 广播更新聊天室成员列表
+                emit('update_members', {'members': members, 'room': room_name}, room=room_name)
+
+        # 保存更新后的聊天室信息
         save_chatrooms()  # 更新聊天室信息
 
-# @socketio.on('disconnect')
-# def handle_disconnect():
-#     username = session.get('username')
-#     if username:
-#         for room_name in chatrooms:
-#             if username in chatrooms[room_name]:
-#                 chatrooms[room_name].remove(username)
-#                 save_chatrooms()  # 更新聊天室信息
-#                 emit('update_members', {'members': chatrooms[room_name]}, room=room_name)
+        # 广播用户退出聊天室的消息
+        # emit('message', f"{username} has left the chat.", broadcast=True)
+
+@app.route('/edit_chatroom_description/<room_name>', methods=['POST'])
+def edit_chatroom_description(room_name):
+    if 'username' not in session:
+        return redirect(url_for('login'))
+
+    # 检查聊天室是否存在
+    if room_name not in chatrooms:
+        flash('Chatroom not found.', 'error')
+        return redirect(url_for('chatrooms_page'))
+
+    # 获取新的聊天室描述
+    new_description = request.form['new_description']
+
+    # 更新聊天室描述
+    chatrooms[room_name]['description'] = new_description
+    save_chatrooms()  # 保存更新后的聊天室数据
+
+    flash('Chatroom description updated successfully!', 'success')
+
+    # 广播聊天室描述更新事件
+    socketio.emit('chatroom_description_updated', {'room': room_name, 'description': new_description}, to=None)
+
+    return redirect(url_for('chatrooms_page'))
+
+
+# 处理踢出用户事件
+@socketio.on('kick')
+def handle_kick(data):
+    room_name = data['room']
+    kicked_user = data['member']
+    username = session['username']
+
+    # 确保只有聊天室的管理员或创建者能踢出成员
+    if username not in chatrooms[room_name]['members']:
+        return  # 不是成员无法踢出
+
+    # # 仅允许聊天室创建者或管理员踢出其他用户
+    # if username != chatrooms[room_name]['creator']:
+    #     flash("You are not authorized to kick users.", "error")
+    #     return
+
+    # 确保被踢出的用户存在于聊天室中
+    if kicked_user in chatrooms[room_name]['members']:
+        # 从聊天室成员中移除被踢出的用户
+        chatrooms[room_name]['members'].remove(kicked_user)
+        save_chatrooms()  # 更新聊天室数据
+
+        # 广播更新后的成员列表
+        emit('update_members', {'room': room_name, 'members': chatrooms[room_name]['members']}, broadcast=True)
+
+        # 通知被踢出的用户
+        emit('message', f"{kicked_user} has been kicked out of the chatroom.", broadcast=True)
+
+        # 发送离开事件给被踢出的用户，确保其跳转到聊天室页面
+        emit('kick_out', {'room': room_name, 'member': kicked_user}, broadcast=True)
+
 
 
 

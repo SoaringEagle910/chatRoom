@@ -5,49 +5,307 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Rooms</title>
     <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f6fb;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h2, h3 {
+            text-align: center;
+            color: #333;
+        }
+
+        .container {
+            width: 80%;
+            max-width: 1200px;
+            padding: 20px;
+        }
+
+        /* Welcome Section */
+        .welcome-section {
+            background-color: #ffffff;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            text-align: center; /* 使子元素居中 */
+        }
+
+        .welcome-section a {
+            text-decoration: none;
+            color: #007bff;
+            font-weight: bold;
+            display: inline-block; /* 确保链接可作为块级元素进行居中 */
+            margin-top: 10px; /* 给链接增加一些顶部间距 */
+        }
+
+
+        /* Chat Room Section */
+        .chatrooms-section {
+            background-color: #ffffff;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .chatrooms-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .room-item {
+            background-color: #f9f9f9;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .room-item a {
+            font-size: 18px;
+            color: #007bff;
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .members-list {
+            font-size: 14px;
+            color: #777;
+        }
+
+        .members-list strong {
+            color: #333;
+        }
+
+        .edit-description {
+            margin-top: 10px;
+            display: none;
+        }
+
+        .edit-description textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .edit-description button {
+            background-color: #007bff;
+            color: #fff;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .edit-description button:hover {
+            background-color: #0056b3;
+        }
+
+        /* New Room Section */
+        .new-room-section {
+            background-color: #ffffff;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .new-room-section form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .new-room-section input,
+        .new-room-section textarea {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+
+        .new-room-section button {
+            background-color: #007bff;
+            color: #fff;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .new-room-section button:hover {
+            background-color: #0056b3;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .footer a {
+            text-decoration: none;
+            color: #007bff;
+        }
+    </style>
     <script>
         var socket = io.connect();
 
         // 监听创建聊天室事件
         socket.on('new_room_created', function(data) {
-            // 获取聊天室名称
             var roomName = data.room_name;
-            // 创建聊天室列表项
+            var description = data.description;  // 获取聊天室描述
             var li = document.createElement('li');
+            li.classList.add('room-item');
+            li.id = 'room-' + roomName;  // 设置 id，以便后续删除
             li.innerHTML = `
                 <a href="/chat/${roomName}">${roomName}</a><br>
-                <strong>Online Members:</strong> No members online
+                <div class="members-list" id="members-${roomName}">
+                    <strong>Online Members:</strong> No members online
+                </div>
+                <p><strong>Description:</strong> ${description}</p>  <!-- 显示聊天室介绍 -->
                 <form method="POST" action="/delete_chatroom/${roomName}" style="display:inline;">
                     <button type="submit">Delete</button>
                 </form>
+                <button onclick="editDescription('${roomName}')">Edit Description</button>
+                <div id="edit-description-${roomName}" class="edit-description" style="display:none;">
+                    <form method="POST" action="/edit_chatroom_description/${roomName}">
+                        <textarea name="new_description" placeholder="New Room Description" required></textarea><br>
+                        <button type="submit">Save</button>
+                    </form>
+                </div>
             `;
-            // 将新聊天室添加到聊天室列表
             document.getElementById('chatroom-list').appendChild(li);
         });
+
+        // 监听更新聊天室描述事件
+        socket.on('chatroom_description_updated', function(data) {
+            var roomName = data.room;
+            var newDescription = data.description;
+
+            // 获取聊天室描述元素
+            var descriptionElement = document.querySelector(`#room-${roomName} p`);
+
+            // 更新聊天室描述
+            if (descriptionElement) {
+                descriptionElement.innerHTML = `<strong>Description:</strong> ${newDescription}`;
+            }
+        });
+
+        // 监听更新成员列表事件
+        socket.on('update_members', function(data) {
+            var roomName = data.room;
+            var membersList = data.members;
+
+            // 获取指定聊天室的成员列表显示区域
+            var membersDiv = document.getElementById('members-' + roomName);
+            if (membersDiv) {
+                // 更新成员显示
+                if (membersList.length > 0) {
+                    membersDiv.innerHTML = `<strong>Online Members:</strong> ${membersList.join(', ')}`;
+                } else {
+                    membersDiv.innerHTML = `<strong>Online Members:</strong> No members online`;
+                }
+            }
+        });
+
+        // 监听聊天室删除事件
+        socket.on('chatroom_deleted', function(data) {
+            var roomName = data.room;
+            var roomItem = document.getElementById('room-' + roomName);
+            if (roomItem) {
+                roomItem.remove();  // 删除该聊天室的显示
+            }
+        });
+
+        // 监听用户退出时，更新聊天室成员列表
+        socket.on('user_left', function(data) {
+            var roomName = data.room;
+            var username = data.username;
+
+            // 获取指定聊天室的成员列表显示区域
+            var membersDiv = document.getElementById('members-' + roomName);
+            if (membersDiv) {
+                // 更新成员显示，移除退出用户
+                var currentMembers = membersDiv.innerHTML.replace('<strong>Online Members:</strong> ', '').split(', ');
+                currentMembers = currentMembers.filter(member => member !== username);
+
+                if (currentMembers.length > 0) {
+                    membersDiv.innerHTML = `<strong>Online Members:</strong> ${currentMembers.join(', ')}`;
+                } else {
+                    membersDiv.innerHTML = `<strong>Online Members:</strong> No members online`;
+                }
+            }
+        });
+
+        // 显示编辑聊天室描述的表单
+        function editDescription(roomName) {
+            var editForm = document.getElementById('edit-description-' + roomName);
+            if (editForm.style.display === 'none') {
+                editForm.style.display = 'block';
+            } else {
+                editForm.style.display = 'none';
+            }
+        }
     </script>
 </head>
 <body>
-    <h2>Welcome, {{ username }}!</h2>
-    <h3>Available Chat Rooms</h3>
-    <ul id="chatroom-list">
-        {% for room, members in chatrooms.items() %}
-            <li>
-                <a href="{{ url_for('chat', room_name=room) }}">{{ room }}</a><br>
-                <strong>Online Members:</strong> {{ ", ".join(members) if members else "No members online" }}
-                <!-- 删除聊天室按钮 -->
-                <form method="POST" action="{{ url_for('delete_chatroom', room_name=room) }}" style="display:inline;">
-                    <button type="submit">Delete</button>
-                </form>
-            </li>
-        {% endfor %}
-    </ul>
+    <div class="container">
+        <!-- Welcome Section -->
+        <div class="welcome-section">
+            <h2>Welcome, {{ username }}!</h2>
+            <a href="{{ url_for('logout') }}">Logout</a>
+        </div>
 
-    <h3>Create a New Room</h3>
-    <form method="POST">
-        <input type="text" name="room_name" placeholder="Room Name" required>
-        <button type="submit">Create</button>
-    </form>
+        <!-- Chat Rooms Section -->
+        <div class="chatrooms-section">
+            <h3>Available Chat Rooms</h3>
+            <ul id="chatroom-list">
+                {% for room, info in chatrooms.items() %}
+                    <li class="room-item" id="room-{{ room }}">
+                        <a href="{{ url_for('chat', room_name=room) }}">{{ room }}</a><br>
+                        <div class="members-list" id="members-{{ room }}">
+                            <strong>Online Members:</strong>
+                            {% if info.members %}
+                                {{ ", ".join(info.members) }}
+                            {% else %}
+                                No members online
+                            {% endif %}
+                        </div>
+                        <p><strong>Description:</strong> {{ info.description }}</p>  <!-- 显示聊天室介绍 -->
+                        <form method="POST" action="{{ url_for('delete_chatroom', room_name=room) }}" style="display:inline;">
+                            <button type="submit">Delete</button>
+                        </form>
+                        <button onclick="editDescription('{{ room }}')">Edit Description</button>
+                        <div id="edit-description-{{ room }}" class="edit-description" style="display:none;">
+                            <form method="POST" action="{{ url_for('edit_chatroom_description', room_name=room) }}">
+                                <textarea name="new_description" placeholder="New Room Description" required></textarea><br>
+                                <button type="submit">Save</button>
+                            </form>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
 
-    <a href="{{ url_for('logout') }}">Logout</a>
+        <!-- New Room Section -->
+        <div class="new-room-section">
+            <h3>Create a New Room</h3>
+            <form method="POST">
+                <input type="text" name="room_name" placeholder="Room Name" required><br>
+                <textarea name="description" placeholder="Room Description" required></textarea><br>  <!-- 输入聊天室介绍 -->
+                <button type="submit">Create</button>
+            </form>
+        </div>
+    </div>
 </body>
 </html>
