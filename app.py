@@ -389,8 +389,24 @@ def handle_kick(data):
         # 发送离开事件给被踢出的用户，确保其跳转到聊天室页面
         emit('kick_out', {'room': room_name, 'member': kicked_user}, broadcast=True)
 
+    from flask import jsonify, request
+    @app.route('/download-chat-log')
+    def download_chat_log():
+        room_name = request.args.get('room_name')  # 获取 URL 中的 room_name 参数
+        if room_name:
+            # 构造聊天记录文件的路径
+            chat_log_file = os.path.join(CHAT_LOGS_FOLDER, f'{room_name}.json')
+            if os.path.exists(chat_log_file):
+                with open(chat_log_file, 'r') as file:
+                    chat_log = json.load(file)
+                return jsonify(chat_log)  # 返回聊天记录的 JSON 数据
+            else:
+                return jsonify({"error": f"Chat log for room '{room_name}' not found."}), 404
+        else:
+            return jsonify({"error": "Room name not provided."}), 400
 
 
 
 if __name__ == '__main__':
+    print("智问聊天室已部署！访问端口: 10.250.9.172:5000")
     socketio.run(app, host='0.0.0.0', port=5000)

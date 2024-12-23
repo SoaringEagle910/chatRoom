@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
 
+
     <style>
         * {
             margin: 0;
@@ -77,15 +78,16 @@
         }
 
         #leave-btn {
-            padding: 12px 20px;
-            margin-top: 20px;
-            background-color: #f44336;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: background-color 0.3s;
+        padding: 12px 20px;
+        margin-top: 20px;
+        margin-bottom: 20px; /* 增加底部外边距 */
+        background-color: #f44336;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background-color 0.3s;
         }
 
         #leave-btn:hover {
@@ -99,6 +101,31 @@
             background-color: #fafafa;
             border-radius: 8px;
             font-size: 1rem;
+        }
+
+        /* 按钮样式 */
+        #download-btn {
+        margin-top: 10px;  /* 给下载按钮增加顶部外边距 */
+        padding: 12px 20px;
+        background: linear-gradient(145deg, #6e7dff, #4d56e1); /* 渐变背景 */
+        color: white;
+        border: none;
+        border-radius: 50px;  /* 圆角 */
+        font-size: 1rem;
+        cursor: pointer;
+        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1), -2px -2px 10px rgba(255, 255, 255, 0.3); /* 阴影效果 */
+        transition: all 0.3s ease; /* 平滑过渡 */
+        }
+
+        #download-btn:hover {
+            background: linear-gradient(145deg, #4d56e1, #6e7dff); /* 悬停时反转渐变 */
+            transform: scale(1.05);  /* 悬停时略微放大 */
+            box-shadow: 4px 4px 15px rgba(0, 0, 0, 0.15), -4px -4px 15px rgba(255, 255, 255, 0.4); /* 悬停时增加阴影 */
+        }
+
+        #download-btn:active {
+            transform: scale(1);  /* 按下按钮时恢复正常大小 */
+            box-shadow: none; /* 按下时去掉阴影 */
         }
 
         .user-message {
@@ -176,6 +203,7 @@
         #welcome-logout {
             display: none;
         }
+
     </style>
 </head>
 <body>
@@ -221,6 +249,11 @@
     </div>
     <input type="text" id="message-input" placeholder="Type a message..." />
     <button id="send-btn">Send</button>
+
+    <!-- 下载聊天记录按钮 -->
+    <button id="download-btn">
+        Download Chat Log
+    </button>
 
     <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
     <script>
@@ -289,6 +322,41 @@
         socket.emit('leave', { room: room });
         window.location.href = '/';  // 被踢出后跳转
     };
+
+    // 处理被踢出聊天室
+    socket.on('kick_out', function(data) {
+        // 使用 JavaScript 的条件判断，而不是 Jinja2 的语法
+        if (data.member === '{{ username }}') {
+            alert(`${data.member} has been kicked out of the chatroom.`);
+            window.location.href = '/chatrooms';  // 被踢出后跳转到聊天室页面
+        }
+    });
+
+    // 下载聊天记录
+    document.getElementById('download-btn').onclick = function() {
+        // 向服务器请求聊天记录（根据 room_name）
+        fetch(`/download-chat-log?room_name=${room}`)
+            .then(response => response.json())  // 假设返回 JSON 格式的聊天记录
+            .then(data => {
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${room}_chat_log.json`;  // 使用聊天室名称作为文件名
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);  // 释放对象 URL
+            })
+            .catch(error => {
+                console.error('Error downloading chat log:', error);
+            });
+    };
+
+
+    // 初次加载时绑定踢出按钮事件
+    bindKickButtons();
     </script>
+
 </body>
 </html>

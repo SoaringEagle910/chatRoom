@@ -22,7 +22,20 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            height: 100vh; /* 使 body 的高度为视口高度 */
+            margin: 0; /* 取消默认外边距 */
+            position: relative;
+        }
+
+        /* LOGO样式 */
+        #logo {
+            position: fixed; /* 固定在页面的最上层 */
+            top: 20px;  /* 距离页面顶部20px */
+            left: 20px; /* 距离页面左边20px */
+            width: 60px;  /* 可以根据需要调整LOGO的大小 */
+            height: auto;
+            border-radius: 10%;  /* 圆角效果 */
+            z-index: 1000;  /* 确保LOGO在最上层 */
         }
 
         .container {
@@ -32,6 +45,8 @@
             width: 400px;
             padding: 40px;
             text-align: center;
+            position: relative; /* 保证容器在页面中定位 */
+            margin-top: 60px;  /* 给容器增加顶部间距，避免LOGO遮挡 */
         }
 
         h2 {
@@ -89,6 +104,8 @@
     </style>
 </head>
 <body>
+    <!-- LOGO -->
+<!--    <img src="logo.png" alt="Logo" id="logo">-->
     <div class="container">
         <h2>Login</h2>
         <form method="POST">
