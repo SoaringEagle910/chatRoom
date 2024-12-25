@@ -4,30 +4,37 @@ from flask_session import Session
 import os
 import json
 from datetime import datetime
+import os
+import openai
 
 app = Flask(__name__)
 
 # 配置 Flask-Session
 app.config['SESSION_TYPE'] = 'filesystem'  # 使用文件系统存储 session
-app.config['SECRET_KEY'] = 'your_secret_key'  # 配置 session 密钥
+app.config['SECRET_KEY'] = 'ZhiWenChatroom'  # 配置 session 密钥
 app.config['SESSION_PERMANENT'] = False  # 设置 session 非永久
 Session(app)
 
 socketio = SocketIO(app, manage_session=False)
 
 # 用户信息存储文件
-USER_FILE = 'users.txt'
+USER_FILE = 'data/users.txt'
 # 聊天室信息存储文件
-CHATROOMS_FILE = 'chatrooms.json'
-# 在线用户存储文件
-ONLINE_USERS_FILE = 'online_users.json'
+CHATROOMS_FILE = 'data/chatrooms.json'
 # 聊天记录存储文件夹
-CHAT_LOGS_FOLDER = 'chat_logs'
+CHAT_LOGS_FOLDER = 'data/chat_logs'
+
+# optional; defaults to `os.environ['OPENAI_API_KEY']`
+openai.api_key = "sk-kkG67QcKM38uotkE70277cB1Bf7741DcA524Ff17814d7718"
+# all client options can be configured just like the `OpenAI` instantiation counterpart
+openai.base_url = "https://free.gpt.ge/v1/"
+# openai.default_headers = {"x-foo": "true"}
+# 初始化对话记录
+gpt_messages = []
 
 # 确保聊天记录文件夹存在
 if not os.path.exists(CHAT_LOGS_FOLDER):
     os.makedirs(CHAT_LOGS_FOLDER)
-
 
 # 加载用户信息
 def get_users():
@@ -50,24 +57,11 @@ def load_chatrooms():
     return {}
 
 
-# 加载在线用户数据
-def load_online_users():
-    if os.path.exists(ONLINE_USERS_FILE):
-        with open(ONLINE_USERS_FILE, 'r') as f:
-            return json.load(f)
-    return {}
-
-
 # 保存聊天室数据
 def save_chatrooms():
     with open(CHATROOMS_FILE, 'w') as f:
         json.dump(chatrooms, f, ensure_ascii=False, indent=4)
 
-
-# 保存在线用户数据
-def save_online_users():
-    with open(ONLINE_USERS_FILE, 'w') as f:
-        json.dump(online_users, f)
 
 
 # 保存聊天记录
@@ -96,8 +90,6 @@ def save_chat_log(room_name, message):
 
 # 初始化数据
 chatrooms = load_chatrooms()
-online_users = load_online_users()
-
 
 # 注册页面
 @app.route('/register', methods=['GET', 'POST'])
@@ -139,6 +131,7 @@ def login():
 
     return render_template('login.html')
 
+# 聊天室创建
 @app.route('/chatrooms', methods=['GET', 'POST'])
 def chatrooms_page():
     if 'username' not in session:
@@ -191,7 +184,6 @@ def delete_chatroom(room_name):
     socketio.emit('chatroom_deleted', {'room': room_name}, to=None)
 
     return redirect(url_for('chatrooms_page'))
-
 
 
 # 进入聊天室
@@ -261,6 +253,30 @@ def home():
     return redirect(url_for('chatrooms_page'))
 
 
+def chat_with_ai(question):
+    # 将用户问题添加到消息列表
+    gpt_messages.append({
+        "role": "user",
+        "content": question
+    })
+
+    completion = openai.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=gpt_messages,
+    )
+
+    # 获取并打印 ChatGPT 的回复
+    reply = completion.choices[0].message.content
+    print("ChatGPT: " + reply)
+
+    # 将 ChatGPT 的回复添加到消息列表
+    gpt_messages.append({
+        "role": "assistant",
+        "content": reply
+    })
+    return reply
+
+
 # 处理聊天消息时，包含用户名
 @socketio.on('message')
 def handle_message(data):
@@ -273,6 +289,21 @@ def handle_message(data):
 
     # 广播消息到房间
     emit('message', message, room=room_name)
+
+    # chat with gpt
+    # 提取消息内容部分，去掉用户名和冒号（即提取实际消息）
+    user_message = data['message']
+
+    # 判断消息是否以 "@GPT:" 开头
+    if user_message.startswith('@GPT'):
+        # 获取 "@GPT:" 后的内容
+        gpt_question = user_message[len('@GPT'):].strip()  # 去掉 "@GPT:" 和前后空格
+        # print("to gpt: " + gpt_question)  # 打印 "@GPT:" 后的内容
+        gpt_response = chat_with_ai(gpt_question)
+        # print("gpt response: " + gpt_response)
+        gpt_message = "GPT: " + gpt_response
+        save_chat_log(room_name, gpt_message)
+        emit('message', gpt_message, room=room_name)
 
 
 @socketio.on('join')
@@ -315,7 +346,6 @@ def handle_leave(data):
     emit('message', f"{username} has left the chat.", room=room_name)
 
 
-
 @socketio.on('disconnect')
 def handle_disconnect():
     username = session.get('username')
@@ -330,8 +360,6 @@ def handle_disconnect():
         # 保存更新后的聊天室信息
         save_chatrooms()  # 更新聊天室信息
 
-        # 广播用户退出聊天室的消息
-        # emit('message', f"{username} has left the chat.", broadcast=True)
 
 @app.route('/edit_chatroom_description/<room_name>', methods=['POST'])
 def edit_chatroom_description(room_name):
@@ -369,11 +397,6 @@ def handle_kick(data):
     if username not in chatrooms[room_name]['members']:
         return  # 不是成员无法踢出
 
-    # # 仅允许聊天室创建者或管理员踢出其他用户
-    # if username != chatrooms[room_name]['creator']:
-    #     flash("You are not authorized to kick users.", "error")
-    #     return
-
     # 确保被踢出的用户存在于聊天室中
     if kicked_user in chatrooms[room_name]['members']:
         # 从聊天室成员中移除被踢出的用户
@@ -389,24 +412,24 @@ def handle_kick(data):
         # 发送离开事件给被踢出的用户，确保其跳转到聊天室页面
         emit('kick_out', {'room': room_name, 'member': kicked_user}, broadcast=True)
 
-    from flask import jsonify, request
-    @app.route('/download-chat-log')
-    def download_chat_log():
-        room_name = request.args.get('room_name')  # 获取 URL 中的 room_name 参数
-        if room_name:
-            # 构造聊天记录文件的路径
-            chat_log_file = os.path.join(CHAT_LOGS_FOLDER, f'{room_name}.json')
-            if os.path.exists(chat_log_file):
-                with open(chat_log_file, 'r') as file:
-                    chat_log = json.load(file)
-                return jsonify(chat_log)  # 返回聊天记录的 JSON 数据
-            else:
-                return jsonify({"error": f"Chat log for room '{room_name}' not found."}), 404
-        else:
-            return jsonify({"error": "Room name not provided."}), 400
 
+from flask import jsonify, request
+@app.route('/download-chat-log')
+def download_chat_log():
+    room_name = request.args.get('room_name')  # 获取 URL 中的 room_name 参数
+    if room_name:
+        # 构造聊天记录文件的路径
+        chat_log_file = os.path.join(CHAT_LOGS_FOLDER, f'{room_name}.json')
+        if os.path.exists(chat_log_file):
+            with open(chat_log_file, 'r') as file:
+                chat_log = json.load(file)
+            return jsonify(chat_log)  # 返回聊天记录的 JSON 数据
+        else:
+            return jsonify({"error": f"Chat log for room '{room_name}' not found."}), 404
+    else:
+        return jsonify({"error": "Room name not provided."}), 400
 
 
 if __name__ == '__main__':
     print("智问聊天室已部署！访问端口: 10.250.9.172:5000")
-    socketio.run(app, host='0.0.0.0', port=5000)
+    socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)
