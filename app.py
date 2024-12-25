@@ -25,7 +25,7 @@ CHATROOMS_FILE = 'data/chatrooms.json'
 CHAT_LOGS_FOLDER = 'data/chat_logs'
 
 # optional; defaults to `os.environ['OPENAI_API_KEY']`
-openai.api_key = "sk-kkG67QcKM38uotkE70277cB1Bf7741DcA524Ff17814d7718"
+openai.api_key = "your api key from https://github.com/popjane/free_chatgpt_api"
 # all client options can be configured just like the `OpenAI` instantiation counterpart
 openai.base_url = "https://free.gpt.ge/v1/"
 # openai.default_headers = {"x-foo": "true"}
