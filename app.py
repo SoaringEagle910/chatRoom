@@ -431,5 +431,5 @@ def download_chat_log():
 
 
 if __name__ == '__main__':
-    print("智问聊天室已部署！访问端口: 10.250.9.172:5000")
+    print("智问聊天室已部署！")
     socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)
